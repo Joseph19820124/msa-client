@@ -24,8 +24,15 @@ COPY --from=build /app/build /usr/share/nginx/html
 # Copy nginx configuration
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# Expose port 80
-EXPOSE 80
+# Create a startup script to handle PORT variable
+RUN echo '#!/bin/sh\n\
+if [ -n "$PORT" ]; then\n\
+  sed -i "s/listen 80;/listen $PORT;/g" /etc/nginx/conf.d/default.conf\n\
+fi\n\
+nginx -g "daemon off;"' > /start.sh && chmod +x /start.sh
 
-# Start nginx
-CMD ["nginx", "-g", "daemon off;"]
+# Railway uses PORT environment variable
+EXPOSE ${PORT:-80}
+
+# Start nginx with dynamic port
+CMD ["/start.sh"]
