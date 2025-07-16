@@ -30,11 +30,11 @@ RUN rm -f /etc/nginx/conf.d/default.conf.original
 # Create start script to handle PORT
 RUN printf '#!/bin/sh\n\
 if [ -n "$PORT" ]; then\n\
-  sed -i "s/listen 80;/listen ${PORT};/g" /etc/nginx/conf.d/default.conf\n\
-  sed -i "s/listen \\[::\\]:80;/listen \\[::\\]:${PORT};/g" /etc/nginx/conf.d/default.conf\n\
+  sed -i "s/listen 8080;/listen ${PORT};/g" /etc/nginx/conf.d/default.conf\n\
+  sed -i "s/listen \\[::\\]:8080;/listen \\[::\\]:${PORT};/g" /etc/nginx/conf.d/default.conf\n\
 fi\n\
 exec nginx -g "daemon off;"\n' > /start.sh && chmod +x /start.sh
 
-EXPOSE 80
+EXPOSE 8080
 
 CMD ["/start.sh"]
