@@ -21,18 +21,20 @@ FROM nginx:alpine
 # Copy built files from build stage
 COPY --from=build /app/build /usr/share/nginx/html
 
-# Copy nginx configuration
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Copy simple nginx configuration
+COPY default.conf /etc/nginx/conf.d/default.conf
 
-# Create a startup script to handle PORT variable
-RUN echo '#!/bin/sh\n\
+# Remove default nginx config
+RUN rm -f /etc/nginx/conf.d/default.conf.original
+
+# Create start script to handle PORT
+RUN printf '#!/bin/sh\n\
 if [ -n "$PORT" ]; then\n\
-  sed -i "s/listen 80;/listen $PORT;/g" /etc/nginx/conf.d/default.conf\n\
+  sed -i "s/listen 80;/listen ${PORT};/g" /etc/nginx/conf.d/default.conf\n\
+  sed -i "s/listen \\[::\\]:80;/listen \\[::\\]:${PORT};/g" /etc/nginx/conf.d/default.conf\n\
 fi\n\
-nginx -g "daemon off;"' > /start.sh && chmod +x /start.sh
+exec nginx -g "daemon off;"\n' > /start.sh && chmod +x /start.sh
 
-# Railway uses PORT environment variable
-EXPOSE ${PORT:-80}
+EXPOSE 80
 
-# Start nginx with dynamic port
 CMD ["/start.sh"]
