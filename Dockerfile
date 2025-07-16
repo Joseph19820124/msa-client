@@ -3,6 +3,14 @@ FROM node:18-alpine as build
 
 WORKDIR /app
 
+# Accept build arguments for API URLs
+ARG REACT_APP_POSTS_SERVICE_URL
+ARG REACT_APP_COMMENTS_SERVICE_URL
+
+# Set environment variables from build args
+ENV REACT_APP_POSTS_SERVICE_URL=${REACT_APP_POSTS_SERVICE_URL}
+ENV REACT_APP_COMMENTS_SERVICE_URL=${REACT_APP_COMMENTS_SERVICE_URL}
+
 # Copy package files
 COPY package*.json ./
 
