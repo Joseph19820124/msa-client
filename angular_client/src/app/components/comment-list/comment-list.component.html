@@ -1,0 +1,26 @@
+<div>
+  <h4 class="comments-title">💬 Comments ({{ comments.length }})</h4>
+  
+  <!-- Loading State -->
+  <div *ngIf="loading" class="no-comments">
+    ⏳ Loading comments...
+  </div>
+
+  <!-- Error State -->
+  <div *ngIf="error && !loading" class="no-comments" style="color: #e53e3e;">
+    ❌ Error loading comments: {{ error }}
+  </div>
+
+  <!-- Comments List -->
+  <div *ngIf="!loading && !error">
+    <ul *ngIf="comments.length > 0" class="comments-list">
+      <li *ngFor="let comment of comments" class="comment-item">
+        {{ comment.content }}
+      </li>
+    </ul>
+    
+    <div *ngIf="comments.length === 0" class="no-comments">
+      No comments yet. Be the first to comment!
+    </div>
+  </div>
+</div>

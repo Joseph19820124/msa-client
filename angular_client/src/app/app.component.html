@@ -1,0 +1,16 @@
+<div class="app-container">
+  <header class="app-header">
+    <h1 class="app-title">📝 BlogSpace</h1>
+    <p class="app-subtitle">Share your thoughts with the world</p>
+  </header>
+  
+  <div class="section">
+    <h2 class="section-title">✨ Create New Post</h2>
+    <app-post-create (postCreated)="onPostCreated()"></app-post-create>
+  </div>
+  
+  <div class="section">
+    <h2 class="section-title">📚 Recent Posts</h2>
+    <app-post-list [refreshTrigger]="refreshTrigger"></app-post-list>
+  </div>
+</div>

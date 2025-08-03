@@ -1,0 +1,34 @@
+<div class="posts-grid">
+  <!-- Loading State -->
+  <div *ngIf="loading" class="loading-state">
+    ⏳ Loading posts...
+  </div>
+
+  <!-- Error State -->
+  <div *ngIf="error && !loading" class="error-state">
+    <p>❌ Error loading posts</p>
+    <p style="font-size: 0.9rem; margin-bottom: 20px;">{{ error }}</p>
+    <button class="retry-button" (click)="onRefresh()">
+      🔄 Retry
+    </button>
+  </div>
+
+  <!-- Posts -->
+  <div *ngIf="!loading && !error">
+    <div *ngIf="posts.length === 0" class="loading-state">
+      <p>📭 No posts yet</p>
+      <p style="font-size: 0.9rem;">Be the first to share something!</p>
+    </div>
+    
+    <div *ngFor="let post of posts" class="post-card">
+      <h3 class="post-title">{{ post.title }}</h3>
+      <div class="comments-section">
+        <app-comment-list [postId]="post.id"></app-comment-list>
+        <app-comment-create 
+          [postId]="post.id" 
+          (commentAdded)="onCommentAdded()">
+        </app-comment-create>
+      </div>
+    </div>
+  </div>
+</div>
