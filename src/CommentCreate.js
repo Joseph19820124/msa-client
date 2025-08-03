@@ -1,18 +1,26 @@
 import React, { useState } from "react";
-import axios from "axios";
+import { useApiConfig, useApiSubmit } from "./hooks/useApi";
+import { commentsApi } from "./services/api";
 
-const CommentCreate = ({ postId }) => {
+const CommentCreate = ({ postId, onCommentAdded }) => {
   const [content, setContent] = useState("");
+  const { commentsUrl } = useApiConfig();
+  const { submit, loading, error } = useApiSubmit();
 
   const onSubmit = async (event) => {
     event.preventDefault();
+    
+    if (!content.trim()) {
+      return;
+    }
 
-    const commentsUrl = process.env.REACT_APP_COMMENTS_SERVICE_URL || "http://localhost:4001";
-    await axios.post(`${commentsUrl}/posts/${postId}/comments`, {
-      content,
-    });
-
-    setContent("");
+    await submit(
+      () => commentsApi.createComment(commentsUrl, postId, { content: content.trim() }),
+      () => {
+        setContent("");
+        if (onCommentAdded) onCommentAdded();
+      }
+    );
   };
 
   return (
@@ -25,10 +33,21 @@ const CommentCreate = ({ postId }) => {
             onChange={(e) => setContent(e.target.value)}
             className="form-control"
             placeholder="Share your thoughts..."
+            disabled={loading}
+            required
           />
         </div>
-        <button className="btn btn-primary" type="submit">
-          💭 Post Comment
+        {error && (
+          <div style={{ color: '#e53e3e', marginBottom: '10px', fontSize: '0.9rem' }}>
+            ❌ Error: {error}
+          </div>
+        )}
+        <button 
+          className="btn btn-primary" 
+          type="submit"
+          disabled={loading || !content.trim()}
+        >
+          {loading ? "⏳ Posting..." : "💭 Post Comment"}
         </button>
       </form>
     </div>
