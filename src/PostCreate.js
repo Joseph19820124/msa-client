@@ -16,17 +16,20 @@ const PostCreate = () => {
   };
 
   return (
-    <div>
+    <div className="enhanced-form">
       <form onSubmit={onSubmit}>
         <div className="form-group">
-          <label>Title</label>
+          <label className="form-label">📝 Post Title</label>
           <input
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             className="form-control"
+            placeholder="What's on your mind?"
           />
         </div>
-        <button className="btn btn-primary">Submit</button>
+        <button className="btn btn-primary" type="submit">
+          🚀 Publish Post
+        </button>
       </form>
     </div>
   );

@@ -18,10 +18,25 @@ const CommentList = ({ postId }) => {
   }, []);
 
   const renderedComments = comments.map((comment) => {
-    return <li key={comment.id}>{comment.content}</li>;
+    return (
+      <li key={comment.id} className="comment-item">
+        {comment.content}
+      </li>
+    );
   });
 
-  return <ul>{renderedComments}</ul>;
+  return (
+    <div>
+      <h4 className="comments-title">💬 Comments ({comments.length})</h4>
+      {comments.length > 0 ? (
+        <ul className="comments-list">{renderedComments}</ul>
+      ) : (
+        <div className="no-comments">
+          No comments yet. Be the first to comment!
+        </div>
+      )}
+    </div>
+  );
 };
 
 export default CommentList;
