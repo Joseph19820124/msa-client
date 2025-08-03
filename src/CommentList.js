@@ -1,34 +1,48 @@
-import React, { useState, useEffect } from "react";
-import axios from "axios";
+import React, { useCallback } from "react";
+import { useApiConfig, useApiCall } from "./hooks/useApi";
+import { commentsApi } from "./services/api";
 
 const CommentList = ({ postId }) => {
-  const [comments, setComments] = useState([]);
+  const { commentsUrl } = useApiConfig();
+  
+  const fetchComments = useCallback(() => 
+    commentsApi.getComments(commentsUrl, postId).then(res => res.data), 
+    [commentsUrl, postId]
+  );
 
-  const fetchData = async () => {
-    const commentsUrl = process.env.REACT_APP_COMMENTS_SERVICE_URL || "http://localhost:4001";
-    const res = await axios.get(
-      `${commentsUrl}/posts/${postId}/comments`
-    );
+  const { data: comments, loading, error } = useApiCall(fetchComments, [commentsUrl, postId]);
 
-    setComments(res.data);
-  };
-
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const renderedComments = comments.map((comment) => {
+  if (loading) {
     return (
-      <li key={comment.id} className="comment-item">
-        {comment.content}
-      </li>
+      <div>
+        <h4 className="comments-title">💬 Comments</h4>
+        <div className="no-comments">⏳ Loading comments...</div>
+      </div>
     );
-  });
+  }
+
+  if (error) {
+    return (
+      <div>
+        <h4 className="comments-title">💬 Comments</h4>
+        <div className="no-comments" style={{ color: '#e53e3e' }}>
+          ❌ Error loading comments: {error}
+        </div>
+      </div>
+    );
+  }
+
+  const commentsArray = comments || [];
+  const renderedComments = commentsArray.map((comment) => (
+    <li key={comment.id} className="comment-item">
+      {comment.content}
+    </li>
+  ));
 
   return (
     <div>
-      <h4 className="comments-title">💬 Comments ({comments.length})</h4>
-      {comments.length > 0 ? (
+      <h4 className="comments-title">💬 Comments ({commentsArray.length})</h4>
+      {commentsArray.length > 0 ? (
         <ul className="comments-list">{renderedComments}</ul>
       ) : (
         <div className="no-comments">

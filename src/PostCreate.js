@@ -1,18 +1,26 @@
 import React, { useState } from "react";
-import axios from "axios";
+import { useApiConfig, useApiSubmit } from "./hooks/useApi";
+import { postsApi } from "./services/api";
 
-const PostCreate = () => {
+const PostCreate = ({ onPostCreated }) => {
   const [title, setTitle] = useState("");
+  const { postsUrl } = useApiConfig();
+  const { submit, loading, error } = useApiSubmit();
 
   const onSubmit = async (event) => {
     event.preventDefault();
+    
+    if (!title.trim()) {
+      return;
+    }
 
-    const postsUrl = process.env.REACT_APP_POSTS_SERVICE_URL || "http://localhost:4000";
-    await axios.post(`${postsUrl}/posts`, {
-      title,
-    });
-
-    setTitle("");
+    await submit(
+      () => postsApi.createPost(postsUrl, { title: title.trim() }),
+      () => {
+        setTitle("");
+        if (onPostCreated) onPostCreated();
+      }
+    );
   };
 
   return (
@@ -25,10 +33,21 @@ const PostCreate = () => {
             onChange={(e) => setTitle(e.target.value)}
             className="form-control"
             placeholder="What's on your mind?"
+            disabled={loading}
+            required
           />
         </div>
-        <button className="btn btn-primary" type="submit">
-          🚀 Publish Post
+        {error && (
+          <div style={{ color: '#e53e3e', marginBottom: '10px', fontSize: '0.9rem' }}>
+            ❌ Error: {error}
+          </div>
+        )}
+        <button 
+          className="btn btn-primary" 
+          type="submit"
+          disabled={loading || !title.trim()}
+        >
+          {loading ? "⏳ Publishing..." : "🚀 Publish Post"}
         </button>
       </form>
     </div>
