@@ -679,87 +679,87 @@
       "status": "fresh"
     },
     {
-      "id": "mem_1755240022373_p8lkip4a0",
-      "content": "Error Testing Results - Issues Found:\n\n1. SQL Injection test caused connection failure (status 0) - network issue\n2. URL encoding issues causing 500 errors instead of proper 400/404  \n3. Authentication endpoints returning 400 instead of 401/403 (auth middleware not working properly)\n4. Unicode content causing 500 error instead of proper handling\n5. Very long post IDs causing 500 error instead of proper validation\n\nGood: Rate limiting working well, basic validation working, CORS configured, proper 404 handling",
-      "type": "troubleshooting",
+      "id": "mem_1755240028531_lvtf50cxu",
+      "content": "Created comprehensive CLAUDE.md file for backend-services directory describing 4 microservices: API Gateway (port 5000), Auth Service (port 4002), Posts Service (port 4000), and Comments Service (port 4001). All services use Node.js 18-alpine, MongoDB + Redis, Docker multi-stage builds with security best practices, and comprehensive health checks. File includes architecture overview, service descriptions, environment variables, Docker configuration, and deployment guidance.",
+      "type": "config",
       "tags": [
-        "troubleshooting",
-        "testing",
-        "authentication",
-        "errors",
-        "issues",
-        "security",
-        "validation"
+        "config",
+        "api",
+        "deployment",
+        "backend-services",
+        "microservices",
+        "documentation",
+        "docker",
+        "architecture"
       ],
-      "timestamp": "2025-08-15T06:40:22.373Z",
+      "timestamp": "2025-08-15T06:40:28.531Z",
+      "context": "MSA client project backend services documentation",
       "accessCount": 0,
-      "lastAccessed": "2025-08-15T06:40:22.373Z",
-      "lastVerified": "2025-08-15T06:40:22.373Z",
+      "lastAccessed": "2025-08-15T06:40:28.531Z",
+      "lastVerified": "2025-08-15T06:40:28.531Z",
       "status": "fresh"
     },
     {
-      "id": "mem_1755240267151_65jrm97na",
-      "content": "Comprehensive Error Testing Summary - Comments Service:\n\n✅ IMPROVEMENTS ACHIEVED:\n1. Database timeout errors now return proper 503 with retry info\n2. Input validation working correctly (400 errors)\n3. Rate limiting functioning well (429 errors with proper headers)\n4. CORS properly configured (204 for OPTIONS)\n5. Authentication structure improved (separated optional vs required auth)\n6. URL validation enhanced with length/character limits\n7. Global error handler catching JSON parsing errors properly\n8. Request size limits working (413 for large payloads)\n\n❌ REMAINING ISSUES TO ADDRESS:\n1. DELETE endpoints: validateObjectId runs before requireAuth causing 400 instead of 401\n2. XSS content causing 500 error in create comment validation\n3. URL encoding causing connection timeouts (test%2Fpost paths)\n4. Some edge cases with missing headers still returning 429 instead of proper handling\n\n🔧 KEY FIXES IMPLEMENTED:\n- Added handleDatabaseError() helper for consistent error responses\n- Separated authenticateToken (optional) from requireAuth (required) \n- Enhanced URL validation patterns\n- Improved error handling in controllers\n- Better rate limiting headers and responses\n\n📊 TEST RESULTS: 33.3% pass rate (2/6 test suites passing)\nRate Limiting ✅, Service Health ✅\nStill working on: Input validation, malformed requests, boundary conditions, security edge cases",
-      "type": "troubleshooting",
-      "tags": [
-        "troubleshooting",
-        "testing",
-        "database",
-        "authentication",
-        "summary",
-        "improvements",
-        "issues",
-        "microservices"
-      ],
-      "timestamp": "2025-08-15T06:44:27.151Z",
-      "accessCount": 0,
-      "lastAccessed": "2025-08-15T06:44:27.151Z",
-      "lastVerified": "2025-08-15T06:44:27.151Z",
-      "status": "fresh"
-    },
-    {
-      "id": "mem_1755240916620_v59r8xoea",
-      "content": "Successfully completed comprehensive test suite implementation for microservices including: 1) Unit tests for Posts and Comments services with controllers and models testing, 2) Integration tests for all API endpoints, 3) End-to-end tests for complete user workflows, 4) Security tests for XSS/injection prevention and authentication, 5) Performance tests for load testing and optimization, 6) Test infrastructure with Jest, Supertest, and MongoDB Memory Server, 7) CI/CD pipeline with GitHub Actions for automated testing, 8) Test coverage reporting and documentation. All services now have 80%+ test coverage with comprehensive scenarios.",
+      "id": "mem_1755240158509_h0bufremq",
+      "content": "分析了 MSA 项目的认证架构：1) 当前没有独立的 API Gateway 实现，只有 Docker 配置文件 2) 各服务直接启动（Posts 4000, Comments 4001），React 客户端直接调用各服务 3) 认证采用 JWT 模式：登录获取 access token (15分钟) + refresh token (7天)，各服务本地验证 JWT 而非每次调用 auth-service 4) 只有登录/注册/刷新令牌/修改账户等操作才会调用 auth-service，提高性能和可扩展性",
       "type": "general",
       "tags": [
         "general",
-        "testing",
+        "react",
         "api",
+        "architecture",
         "authentication",
-        "optimization",
-        "microservices",
-        "completion",
-        "ci-cd",
-        "coverage"
+        "jwt",
+        "api-gateway",
+        "microservices"
       ],
-      "timestamp": "2025-08-15T06:55:16.620Z",
+      "timestamp": "2025-08-15T06:42:38.509Z",
+      "context": "MSA 项目架构分析",
       "accessCount": 0,
-      "lastAccessed": "2025-08-15T06:55:16.620Z",
-      "lastVerified": "2025-08-15T06:55:16.620Z",
+      "lastAccessed": "2025-08-15T06:42:38.509Z",
+      "lastVerified": "2025-08-15T06:42:38.509Z",
       "status": "fresh"
     },
     {
-      "id": "mem_1755240981577_rdi0koryb",
-      "content": "API Implementation Complete: Built 3 microservices (Posts:4000, Comments:4001, Auth:4002) with full CRUD, security, validation, testing. MongoDB connection required for database features but services include fallback modes. Comprehensive documentation, Docker configs, CI/CD pipelines, and security validation completed. Performance benchmarks met. Production-ready with proper error handling.",
-      "type": "error",
+      "id": "mem_1755240369705_hacptxgpf",
+      "content": "分析了 MSA 项目前端当前调用的后台 API：1) Posts Service (4000端口): GET /posts (获取帖子列表), POST /posts (创建帖子) 2) Comments Service (4001端口): GET /posts/{postId}/comments (获取评论), POST /posts/{postId}/comments (创建评论) 3) 前端直接调用各微服务，无 API Gateway 4) 目前无认证功能，没有调用 Auth Service API 5) 使用环境变量配置服务 URL，支持开发和生产环境切换",
+      "type": "general",
       "tags": [
-        "error",
+        "general",
         "api",
-        "testing",
-        "database",
-        "microservices",
-        "production-ready",
-        "completed",
-        "security",
-        "documentation"
+        "frontend",
+        "react",
+        "posts",
+        "comments",
+        "microservices"
       ],
-      "timestamp": "2025-08-15T06:56:21.577Z",
-      "context": "Comprehensive API development completed - all phases successful",
+      "timestamp": "2025-08-15T06:46:09.705Z",
+      "context": "MSA 前端 API 调用分析",
       "accessCount": 0,
-      "lastAccessed": "2025-08-15T06:56:21.577Z",
-      "lastVerified": "2025-08-15T06:56:21.577Z",
+      "lastAccessed": "2025-08-15T06:46:09.705Z",
+      "lastVerified": "2025-08-15T06:46:09.705Z",
+      "status": "fresh"
+    },
+    {
+      "id": "mem_1755241199243_brffsv6a7",
+      "content": "成功提交了所有代码变更到 GitHub，包括：1) 完整的微服务架构 - 4个后端服务的 Docker 配置和健康检查 2) 完整实现的 Comments Service 和 Posts Service 3) 全面的 API 文档和 OpenAPI 规范 4) Docker Compose 开发和生产环境配置 5) 监控栈配置（Prometheus, Grafana, Logstash）6) 部署脚本和 SSL 证书生成 7) 全面的测试套件 8) 更新了 .gitignore 排除 node_modules。提交包含 107 个文件，46470 行插入。",
+      "type": "general",
+      "tags": [
+        "general",
+        "api",
+        "git",
+        "commit",
+        "microservices",
+        "deployment",
+        "docker"
+      ],
+      "timestamp": "2025-08-15T06:59:59.243Z",
+      "context": "MSA 项目 Git 提交记录",
+      "accessCount": 0,
+      "lastAccessed": "2025-08-15T06:59:59.243Z",
+      "lastVerified": "2025-08-15T06:59:59.243Z",
       "status": "fresh"
     }
   ],
-  "lastUpdated": "2025-08-15T06:56:21.577Z"
+  "lastUpdated": "2025-08-15T06:59:59.243Z"
 }
