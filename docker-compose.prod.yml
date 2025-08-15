@@ -1,0 +1,510 @@
+version: '3.8'
+
+services:
+  # Database Services
+  mongodb:
+    image: mongo:7.0
+    container_name: msa-mongodb-prod
+    restart: always
+    environment:
+      MONGO_INITDB_ROOT_USERNAME_FILE: /run/secrets/mongodb_root_username
+      MONGO_INITDB_ROOT_PASSWORD_FILE: /run/secrets/mongodb_root_password
+      MONGO_INITDB_DATABASE: admin
+    volumes:
+      - mongodb_data:/data/db
+      - mongodb_config:/data/configdb
+      - ./database/mongo-init:/docker-entrypoint-initdb.d:ro
+    networks:
+      - msa-backend
+    secrets:
+      - mongodb_root_username
+      - mongodb_root_password
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+        reservations:
+          memory: 512M
+          cpus: '0.25'
+
+  redis:
+    image: redis:7.2-alpine
+    container_name: msa-redis-prod
+    restart: always
+    command: redis-server /usr/local/etc/redis/redis.conf
+    volumes:
+      - redis_data:/data
+      - ./config/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    networks:
+      - msa-backend
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.25'
+        reservations:
+          memory: 256M
+          cpus: '0.1'
+
+  # Backend Services
+  auth-service:
+    image: msa-auth-service:latest
+    container_name: msa-auth-service-prod
+    restart: always
+    environment:
+      NODE_ENV: production
+      PORT: 4002
+    env_file:
+      - ./backend-services/auth-service/.env.prod
+    volumes:
+      - auth_logs:/app/logs
+    secrets:
+      - jwt_secret
+      - refresh_token_secret
+      - mongodb_uri
+      - redis_password
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - msa-backend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      replicas: 2
+      update_config:
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+
+  posts-service:
+    image: msa-posts-service:latest
+    container_name: msa-posts-service-prod
+    restart: always
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+    env_file:
+      - ./backend-services/posts-service/.env.prod
+    volumes:
+      - posts_logs:/app/logs
+      - posts_uploads:/app/uploads
+    secrets:
+      - jwt_secret
+      - mongodb_uri
+      - redis_password
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+    networks:
+      - msa-backend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      replicas: 2
+      update_config:
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+
+  comments-service:
+    image: msa-comments-service:latest
+    container_name: msa-comments-service-prod
+    restart: always
+    environment:
+      NODE_ENV: production
+      PORT: 4001
+    env_file:
+      - ./backend-services/comments-service/.env.prod
+    volumes:
+      - comments_logs:/app/logs
+    secrets:
+      - jwt_secret
+      - mongodb_uri
+      - redis_password
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+      posts-service:
+        condition: service_healthy
+    networks:
+      - msa-backend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      replicas: 2
+      update_config:
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+
+  api-gateway:
+    image: msa-api-gateway:latest
+    container_name: msa-api-gateway-prod
+    restart: always
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+    env_file:
+      - ./backend-services/api-gateway/.env.prod
+    volumes:
+      - gateway_logs:/app/logs
+    secrets:
+      - jwt_secret
+      - redis_password
+    depends_on:
+      redis:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+      posts-service:
+        condition: service_healthy
+      comments-service:
+        condition: service_healthy
+    networks:
+      - msa-backend
+      - msa-frontend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      replicas: 2
+      update_config:
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+
+  # Load Balancer
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: msa-nginx-prod
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./config/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./config/nginx/sites-available:/etc/nginx/sites-available:ro
+      - ./ssl/certs:/etc/nginx/ssl:ro
+      - nginx_logs:/var/log/nginx
+    depends_on:
+      - api-gateway
+      - client
+    networks:
+      - msa-frontend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+        reservations:
+          memory: 128M
+          cpus: '0.1'
+
+  # Frontend Service
+  client:
+    image: msa-client:latest
+    container_name: msa-client-prod
+    restart: always
+    environment:
+      NODE_ENV: production
+    volumes:
+      - client_logs:/var/log/nginx
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+    networks:
+      - msa-frontend
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    deploy:
+      replicas: 2
+      update_config:
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+        reservations:
+          memory: 128M
+          cpus: '0.1'
+
+  # Monitoring Services
+  prometheus:
+    image: prom/prometheus:v2.47.0
+    container_name: msa-prometheus-prod
+    restart: always
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    volumes:
+      - ./config/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    networks:
+      - msa-backend
+      - msa-monitoring
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+
+  grafana:
+    image: grafana/grafana:10.1.0
+    container_name: msa-grafana-prod
+    restart: always
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD__FILE: /run/secrets/grafana_admin_password
+      GF_USERS_ALLOW_SIGN_UP: false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./config/grafana/provisioning:/etc/grafana/provisioning:ro
+    secrets:
+      - grafana_admin_password
+    networks:
+      - msa-monitoring
+    depends_on:
+      - prometheus
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.25'
+        reservations:
+          memory: 128M
+          cpus: '0.1'
+
+  # Log Management
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.9.0
+    container_name: msa-elasticsearch-prod
+    restart: always
+    environment:
+      - discovery.type=single-node
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+      - xpack.security.enabled=false
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    networks:
+      - msa-logging
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '0.5'
+        reservations:
+          memory: 512M
+          cpus: '0.25'
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.9.0
+    container_name: msa-logstash-prod
+    restart: always
+    volumes:
+      - ./config/logstash/pipeline:/usr/share/logstash/pipeline:ro
+      - ./config/logstash/config:/usr/share/logstash/config:ro
+    networks:
+      - msa-logging
+    depends_on:
+      - elasticsearch
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.9.0
+    container_name: msa-kibana-prod
+    restart: always
+    environment:
+      ELASTICSEARCH_HOSTS: http://elasticsearch:9200
+    networks:
+      - msa-logging
+    depends_on:
+      - elasticsearch
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.25'
+        reservations:
+          memory: 256M
+          cpus: '0.1'
+
+# Docker Secrets
+secrets:
+  mongodb_root_username:
+    file: ./secrets/mongodb_root_username.txt
+  mongodb_root_password:
+    file: ./secrets/mongodb_root_password.txt
+  mongodb_uri:
+    file: ./secrets/mongodb_uri.txt
+  redis_password:
+    file: ./secrets/redis_password.txt
+  jwt_secret:
+    file: ./secrets/jwt_secret.txt
+  refresh_token_secret:
+    file: ./secrets/refresh_token_secret.txt
+  grafana_admin_password:
+    file: ./secrets/grafana_admin_password.txt
+
+# Named Volumes
+volumes:
+  mongodb_data:
+    driver: local
+  mongodb_config:
+    driver: local
+  redis_data:
+    driver: local
+  auth_logs:
+    driver: local
+  posts_logs:
+    driver: local
+  comments_logs:
+    driver: local
+  gateway_logs:
+    driver: local
+  client_logs:
+    driver: local
+  nginx_logs:
+    driver: local
+  posts_uploads:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+  elasticsearch_data:
+    driver: local
+
+# Networks
+networks:
+  msa-backend:
+    driver: bridge
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.21.0.0/16
+  msa-frontend:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.22.0.0/16
+  msa-monitoring:
+    driver: bridge
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.23.0.0/16
+  msa-logging:
+    driver: bridge
+    internal: true
+    ipam:
+      config:
+        - subnet: 172.24.0.0/16

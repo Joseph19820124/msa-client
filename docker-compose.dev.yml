@@ -1,0 +1,275 @@
+version: '3.8'
+
+services:
+  # Database Services
+  mongodb:
+    image: mongo:7.0
+    container_name: msa-mongodb-dev
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: rootpassword
+      MONGO_INITDB_DATABASE: admin
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+      - ./database/mongo-init:/docker-entrypoint-initdb.d
+    networks:
+      - msa-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  redis:
+    image: redis:7.2-alpine
+    container_name: msa-redis-dev
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass redispassword
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - msa-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+
+  # Backend Services
+  auth-service:
+    build:
+      context: ./backend-services/auth-service
+      dockerfile: Dockerfile
+    container_name: msa-auth-service-dev
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      PORT: 4002
+      MONGODB_URI: mongodb://root:rootpassword@mongodb:27017/auth_db?authSource=admin
+      REDIS_URL: redis://:redispassword@redis:6379/2
+      JWT_SECRET: dev-jwt-secret-key-32-characters-long
+      REFRESH_TOKEN_SECRET: dev-refresh-token-secret-32-chars
+      CORS_ORIGIN: http://localhost:3000,http://localhost:8080
+    ports:
+      - "4002:4002"
+    volumes:
+      - ./backend-services/auth-service:/app
+      - /app/node_modules
+      - auth_logs:/app/logs
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - msa-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  posts-service:
+    build:
+      context: ./backend-services/posts-service
+      dockerfile: Dockerfile
+    container_name: msa-posts-service-dev
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      PORT: 4000
+      MONGODB_URI: mongodb://root:rootpassword@mongodb:27017/posts_db?authSource=admin
+      REDIS_URL: redis://:redispassword@redis:6379/0
+      JWT_SECRET: dev-jwt-secret-key-32-characters-long
+      AUTH_SERVICE_URL: http://auth-service:4002
+      CORS_ORIGIN: http://localhost:3000,http://localhost:8080
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./backend-services/posts-service:/app
+      - /app/node_modules
+      - posts_logs:/app/logs
+      - posts_uploads:/app/uploads
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+    networks:
+      - msa-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  comments-service:
+    build:
+      context: ./backend-services/comments-service
+      dockerfile: Dockerfile
+    container_name: msa-comments-service-dev
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      PORT: 4001
+      MONGODB_URI: mongodb://root:rootpassword@mongodb:27017/comments_db?authSource=admin
+      REDIS_URL: redis://:redispassword@redis:6379/1
+      JWT_SECRET: dev-jwt-secret-key-32-characters-long
+      AUTH_SERVICE_URL: http://auth-service:4002
+      POSTS_SERVICE_URL: http://posts-service:4000
+      CORS_ORIGIN: http://localhost:3000,http://localhost:8080
+    ports:
+      - "4001:4001"
+    volumes:
+      - ./backend-services/comments-service:/app
+      - /app/node_modules
+      - comments_logs:/app/logs
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+      posts-service:
+        condition: service_healthy
+    networks:
+      - msa-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  api-gateway:
+    build:
+      context: ./backend-services/api-gateway
+      dockerfile: Dockerfile
+    container_name: msa-api-gateway-dev
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      PORT: 5000
+      REDIS_URL: redis://:redispassword@redis:6379/3
+      JWT_SECRET: dev-jwt-secret-key-32-characters-long
+      POSTS_SERVICE_URL: http://posts-service:4000
+      COMMENTS_SERVICE_URL: http://comments-service:4001
+      AUTH_SERVICE_URL: http://auth-service:4002
+      CORS_ORIGIN: http://localhost:3000,http://localhost:8080
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./backend-services/api-gateway:/app
+      - /app/node_modules
+      - gateway_logs:/app/logs
+    depends_on:
+      redis:
+        condition: service_healthy
+      auth-service:
+        condition: service_healthy
+      posts-service:
+        condition: service_healthy
+      comments-service:
+        condition: service_healthy
+    networks:
+      - msa-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Frontend Service
+  client:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    container_name: msa-client-dev
+    restart: unless-stopped
+    environment:
+      REACT_APP_API_GATEWAY_URL: http://localhost:5000
+      REACT_APP_POSTS_SERVICE_URL: http://localhost:4000
+      REACT_APP_COMMENTS_SERVICE_URL: http://localhost:4001
+      REACT_APP_AUTH_SERVICE_URL: http://localhost:4002
+      REACT_APP_ENV: development
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app
+      - /app/node_modules
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+    networks:
+      - msa-network
+    stdin_open: true
+    tty: true
+
+  # Development Tools
+  mongo-express:
+    image: mongo-express:1.0.0
+    container_name: msa-mongo-express-dev
+    restart: unless-stopped
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: root
+      ME_CONFIG_MONGODB_ADMINPASSWORD: rootpassword
+      ME_CONFIG_MONGODB_URL: mongodb://root:rootpassword@mongodb:27017/
+      ME_CONFIG_BASICAUTH_USERNAME: admin
+      ME_CONFIG_BASICAUTH_PASSWORD: admin123
+    ports:
+      - "8081:8081"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - msa-network
+
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: msa-redis-commander-dev
+    restart: unless-stopped
+    environment:
+      REDIS_HOSTS: local:redis:6379:2:redispassword
+    ports:
+      - "8082:8081"
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - msa-network
+
+volumes:
+  mongodb_data:
+    driver: local
+  redis_data:
+    driver: local
+  auth_logs:
+    driver: local
+  posts_logs:
+    driver: local
+  comments_logs:
+    driver: local
+  gateway_logs:
+    driver: local
+  posts_uploads:
+    driver: local
+
+networks:
+  msa-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

@@ -1,0 +1,1291 @@
+openapi: 3.0.3
+info:
+  title: Comments Service API
+  description: |
+    The Comments Service manages comment lifecycle operations for blog posts including creation, 
+    retrieval, moderation, and threading. This service operates independently and provides 
+    RESTful endpoints for discussion management with support for nested commenting, moderation 
+    workflows, and real-time updates.
+    
+    ## Features
+    - CRUD operations for comments
+    - Nested comment threading (up to 10 levels deep)
+    - Comment voting system
+    - Moderation and content filtering
+    - Real-time updates via WebSocket
+    - User reputation system
+    - Comment search and filtering
+    
+    ## Threading System
+    Comments support nested replies with a maximum depth of 10 levels. Each comment can have
+    multiple replies, creating a tree structure that can be rendered in threaded or flat modes.
+    
+    ## Moderation
+    Comments go through automatic and manual moderation processes including profanity filtering,
+    spam detection, and user reputation checks.
+  version: 1.0.0
+  contact:
+    name: API Support
+    email: api-support@example.com
+    url: https://docs.example.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:4001
+    description: Development server
+  - url: https://api.example.com/comments
+    description: Production server
+
+security:
+  - BearerAuth: []
+  - {}
+
+paths:
+  /posts/{postId}/comments:
+    get:
+      summary: Retrieve comments for a specific post
+      description: |
+        Returns all comments associated with a blog post. Supports nested threading, 
+        pagination, and moderation status filtering. Anonymous users see only approved 
+        comments; authenticated users may see pending comments they authored.
+      operationId: getPostComments
+      security:
+        - BearerAuth: []
+        - {}
+      parameters:
+        - name: postId
+          in: path
+          required: true
+          description: Target post identifier
+          schema:
+            type: string
+            format: uuid
+        - name: page
+          in: query
+          description: Page number for pagination
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          description: Number of comments per page
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 50
+        - name: sort
+          in: query
+          description: Sort field
+          schema:
+            type: string
+            enum: [created, updated, votes]
+            default: created
+        - name: order
+          in: query
+          description: Sort order
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: asc
+        - name: status
+          in: query
+          description: Filter by moderation status (moderator+ only)
+          schema:
+            type: string
+            enum: [active, moderated, deleted]
+        - name: threaded
+          in: query
+          description: Return nested comment structure
+          schema:
+            type: boolean
+            default: true
+        - name: maxDepth
+          in: query
+          description: Maximum nesting depth for threaded comments
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 10
+            default: 5
+      responses:
+        '200':
+          description: Comments retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  comments:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Comment'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+                  postExists:
+                    type: boolean
+                    description: Whether the target post exists
+              examples:
+                threaded_comments:
+                  summary: Threaded comments response
+                  value:
+                    comments:
+                      - id: "com_789e0123-e45f-67g8-h901-234567890123"
+                        content: "Great article! This really helped me understand microservices better."
+                        postId: "123e4567-e89b-12d3-a456-426614174000"
+                        authorId: "abc12345-6789-def0-1234-567890abcdef"
+                        authorName: "jane_smith"
+                        parentId: null
+                        status: "active"
+                        depth: 0
+                        votes:
+                          up: 5
+                          down: 0
+                          total: 5
+                        createdAt: "2025-08-15T11:30:00Z"
+                        updatedAt: "2025-08-15T11:30:00Z"
+                        replies:
+                          - id: "com_456e7890-e12b-34d5-a678-901234567890"
+                            content: "Thanks! I'm glad it was helpful. Are you planning to implement microservices in your project?"
+                            postId: "123e4567-e89b-12d3-a456-426614174000"
+                            authorId: "987fcdeb-51a2-43d1-b123-456789abcdef"
+                            authorName: "john_doe"
+                            parentId: "com_789e0123-e45f-67g8-h901-234567890123"
+                            status: "active"
+                            depth: 1
+                            votes:
+                              up: 2
+                              down: 0
+                              total: 2
+                            createdAt: "2025-08-15T12:15:00Z"
+                            updatedAt: "2025-08-15T12:15:00Z"
+                            replies: []
+                    pagination:
+                      page: 1
+                      limit: 50
+                      totalPages: 1
+                      totalComments: 2
+                      hasNext: false
+                      hasPrev: false
+                    postExists: true
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/PostNotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    post:
+      summary: Create a new comment on a post
+      description: |
+        Creates a new comment on the specified blog post. Can be a top-level comment 
+        or a reply to an existing comment. Comments are subject to content validation 
+        and may require moderation based on user reputation and content filters.
+      operationId: createComment
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: postId
+          in: path
+          required: true
+          description: Target post identifier
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCommentRequest'
+            examples:
+              top_level_comment:
+                summary: Create top-level comment
+                value:
+                  content: "This is exactly what I needed to learn about microservices. The examples are particularly helpful!"
+              reply_comment:
+                summary: Create reply comment
+                value:
+                  content: "I agree! Have you tried implementing any of these patterns yet?"
+                  parentId: "com_def45678-9abc-01e2-f345-6789abcdef01"
+      responses:
+        '201':
+          description: Comment created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Comment'
+              example:
+                id: "com_def45678-9abc-01e2-f345-6789abcdef01"
+                content: "This is exactly what I needed to learn about microservices. The examples are particularly helpful!"
+                postId: "123e4567-e89b-12d3-a456-426614174000"
+                authorId: "abc12345-6789-def0-1234-567890abcdef"
+                authorName: "jane_smith"
+                parentId: null
+                status: "active"
+                depth: 0
+                votes:
+                  up: 0
+                  down: 0
+                  total: 0
+                createdAt: "2025-08-15T16:20:00Z"
+                updatedAt: "2025-08-15T16:20:00Z"
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/ResourceNotFound'
+        '409':
+          $ref: '#/components/responses/DepthLimitExceeded'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /comments/{id}:
+    get:
+      summary: Retrieve a specific comment by ID
+      description: |
+        Returns detailed information about a specific comment including its thread context. 
+        Useful for direct comment linking and moderation workflows.
+      operationId: getCommentById
+      security:
+        - BearerAuth: []
+        - {}
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Unique comment identifier
+          schema:
+            type: string
+            format: uuid
+        - name: includeThread
+          in: query
+          description: Include parent and child comments
+          schema:
+            type: boolean
+            default: false
+        - name: threadDepth
+          in: query
+          description: Depth of thread context to include
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 5
+            default: 2
+      responses:
+        '200':
+          description: Comment retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Comment'
+                  - type: object
+                    properties:
+                      thread:
+                        type: object
+                        description: Thread context (if includeThread=true)
+                        properties:
+                          parent:
+                            $ref: '#/components/schemas/Comment'
+                            nullable: true
+                          children:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/Comment'
+              example:
+                id: "com_def45678-9abc-01e2-f345-6789abcdef01"
+                content: "This is exactly what I needed to learn about microservices. The examples are particularly helpful!"
+                postId: "123e4567-e89b-12d3-a456-426614174000"
+                authorId: "abc12345-6789-def0-1234-567890abcdef"
+                authorName: "jane_smith"
+                parentId: null
+                status: "active"
+                depth: 0
+                votes:
+                  up: 3
+                  down: 0
+                  total: 3
+                createdAt: "2025-08-15T16:20:00Z"
+                updatedAt: "2025-08-15T16:20:00Z"
+                thread:
+                  parent: null
+                  children:
+                    - id: "com_ghi90123-4def-567g-h890-123456789ghi"
+                      content: "I agree! Have you tried implementing any of these patterns yet?"
+                      authorName: "john_doe"
+                      createdAt: "2025-08-15T16:25:00Z"
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    put:
+      summary: Update an existing comment
+      description: |
+        Updates the content of an existing comment. Users can only edit their own comments 
+        within a limited time window (typically 15 minutes). Moderators can edit any comment 
+        and change moderation status.
+      operationId: updateComment
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Unique comment identifier
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateCommentRequest'
+            examples:
+              update_content:
+                summary: Update comment content
+                value:
+                  content: "This is exactly what I needed to learn about microservices. The examples are particularly helpful! Thanks for sharing."
+              moderate_comment:
+                summary: Moderate comment (moderator only)
+                value:
+                  status: "moderated"
+      responses:
+        '200':
+          description: Comment updated successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Comment'
+                  - type: object
+                    properties:
+                      edited:
+                        type: boolean
+                        description: Whether comment has been edited
+                      editWindow:
+                        type: boolean
+                        description: Whether comment is still in edit window
+              example:
+                id: "com_def45678-9abc-01e2-f345-6789abcdef01"
+                content: "This is exactly what I needed to learn about microservices. The examples are particularly helpful! Thanks for sharing."
+                postId: "123e4567-e89b-12d3-a456-426614174000"
+                authorId: "abc12345-6789-def0-1234-567890abcdef"
+                authorName: "jane_smith"
+                parentId: null
+                status: "active"
+                depth: 0
+                votes:
+                  up: 3
+                  down: 0
+                  total: 3
+                createdAt: "2025-08-15T16:20:00Z"
+                updatedAt: "2025-08-15T16:32:00Z"
+                edited: true
+                editWindow: true
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/EditPermissionDenied'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    delete:
+      summary: Delete a comment
+      description: |
+        Marks a comment as deleted. Comments with replies are soft-deleted (content replaced 
+        with placeholder) while leaf comments can be hard-deleted. Users can only delete 
+        their own comments; moderators can delete any comment.
+      operationId: deleteComment
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Unique comment identifier
+          schema:
+            type: string
+            format: uuid
+        - name: hard
+          in: query
+          description: Force hard delete (moderator+ only)
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '204':
+          description: Comment successfully deleted (no content returned)
+        '200':
+          description: Comment soft-deleted (has replies)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                    description: Comment identifier
+                  status:
+                    type: string
+                    enum: [deleted]
+                    description: Updated status
+                  deletionType:
+                    type: string
+                    enum: [soft, hard]
+                    description: Type of deletion performed
+                  reason:
+                    type: string
+                    description: Reason for soft deletion
+              example:
+                id: "com_def45678-9abc-01e2-f345-6789abcdef01"
+                status: "deleted"
+                deletionType: "soft"
+                reason: "Comment has replies and cannot be hard-deleted"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /comments/{id}/vote:
+    post:
+      summary: Vote on a comment
+      description: |
+        Casts an upvote or downvote on a comment. Users can change their vote or remove it entirely. 
+        Vote manipulation detection algorithms prevent abuse.
+      operationId: voteComment
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Unique comment identifier
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VoteRequest'
+            examples:
+              upvote:
+                summary: Upvote comment
+                value:
+                  vote: "up"
+              downvote:
+                summary: Downvote comment
+                value:
+                  vote: "down"
+              remove_vote:
+                summary: Remove existing vote
+                value:
+                  vote: "none"
+      responses:
+        '200':
+          description: Vote recorded successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VoteResponse'
+              example:
+                commentId: "com_def45678-9abc-01e2-f345-6789abcdef01"
+                userVote: "up"
+                votes:
+                  up: 4
+                  down: 0
+                  total: 4
+                changed: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/SelfVoteConflict'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /comments/search:
+    get:
+      summary: Search comments across all posts
+      description: |
+        Full-text search across comment content. Supports filtering by post, author, 
+        and date ranges. Useful for moderation and content discovery.
+      operationId: searchComments
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: Search query
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 200
+        - name: postId
+          in: query
+          description: Filter by specific post
+          schema:
+            type: string
+            format: uuid
+        - name: authorId
+          in: query
+          description: Filter by specific author
+          schema:
+            type: string
+            format: uuid
+        - name: status
+          in: query
+          description: Filter by moderation status
+          schema:
+            type: string
+            enum: [active, moderated, deleted]
+        - name: fromDate
+          in: query
+          description: Filter comments from this date
+          schema:
+            type: string
+            format: date-time
+        - name: toDate
+          in: query
+          description: Filter comments to this date
+          schema:
+            type: string
+            format: date-time
+        - name: page
+          in: query
+          description: Page number for pagination
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          description: Number of results per page
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  query:
+                    type: string
+                    description: Original search query
+                  results:
+                    type: array
+                    items:
+                      allOf:
+                        - $ref: '#/components/schemas/Comment'
+                        - type: object
+                          properties:
+                            relevanceScore:
+                              type: number
+                              description: Search relevance score
+                            highlights:
+                              type: array
+                              description: Highlighted text snippets
+                              items:
+                                type: string
+                            postTitle:
+                              type: string
+                              description: Title of the post this comment belongs to
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /moderation/comments:
+    get:
+      summary: Get comments pending moderation
+      description: |
+        Returns comments that require moderation review. Only accessible to users 
+        with moderator or admin roles.
+      operationId: getModerationQueue
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          description: Filter by moderation status
+          schema:
+            type: string
+            enum: [pending, flagged, reported]
+            default: pending
+        - name: priority
+          in: query
+          description: Filter by priority level
+          schema:
+            type: string
+            enum: [low, medium, high, critical]
+        - name: page
+          in: query
+          description: Page number for pagination
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          description: Number of items per page
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+      responses:
+        '200':
+          description: Moderation queue retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  comments:
+                    type: array
+                    items:
+                      allOf:
+                        - $ref: '#/components/schemas/Comment'
+                        - type: object
+                          properties:
+                            moderationFlags:
+                              type: array
+                              items:
+                                type: string
+                            reportCount:
+                              type: integer
+                            priority:
+                              type: string
+                              enum: [low, medium, high, critical]
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /moderation/comments/{id}/action:
+    post:
+      summary: Take moderation action on a comment
+      description: |
+        Approve, reject, or take other moderation actions on a comment. 
+        Only accessible to users with moderator or admin roles.
+      operationId: moderateComment
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Comment identifier
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ModerationAction'
+      responses:
+        '200':
+          description: Moderation action completed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  commentId:
+                    type: string
+                    format: uuid
+                  action:
+                    type: string
+                    enum: [approve, reject, flag, delete]
+                  status:
+                    type: string
+                    enum: [active, moderated, deleted]
+                  moderatedBy:
+                    type: string
+                    description: Moderator username
+                  moderatedAt:
+                    type: string
+                    format: date-time
+                  reason:
+                    type: string
+                    description: Moderation reason
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /health:
+    get:
+      summary: Service health check
+      description: Returns the health status of the Comments Service
+      operationId: getHealth
+      security: []
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+              example:
+                status: "healthy"
+                timestamp: "2025-08-15T12:00:00Z"
+                version: "1.0.0"
+                uptime: 86400
+                dependencies:
+                  database: "healthy"
+                  cache: "healthy"
+                  posts_service: "healthy"
+        '503':
+          description: Service is unhealthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT Bearer token obtained from the Authentication Service
+
+  schemas:
+    Comment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique comment identifier
+          readOnly: true
+        content:
+          type: string
+          maxLength: 1000
+          description: Comment content
+        postId:
+          type: string
+          format: uuid
+          description: Associated post identifier
+          readOnly: true
+        authorId:
+          type: string
+          format: uuid
+          description: Comment author identifier
+          readOnly: true
+        authorName:
+          type: string
+          description: Author display name
+          readOnly: true
+        parentId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Parent comment ID for nested replies
+          readOnly: true
+        status:
+          type: string
+          enum: [active, moderated, deleted]
+          description: Moderation status
+          readOnly: true
+        depth:
+          type: integer
+          minimum: 0
+          description: Nesting level (0 for top-level comments)
+          readOnly: true
+        votes:
+          type: object
+          description: Vote counts
+          readOnly: true
+          properties:
+            up:
+              type: integer
+              minimum: 0
+              description: Upvote count
+            down:
+              type: integer
+              minimum: 0
+              description: Downvote count
+            total:
+              type: integer
+              description: Net vote score
+          required:
+            - up
+            - down
+            - total
+        createdAt:
+          type: string
+          format: date-time
+          description: Creation timestamp
+          readOnly: true
+        updatedAt:
+          type: string
+          format: date-time
+          description: Last update timestamp
+          readOnly: true
+        replies:
+          type: array
+          description: Nested reply comments (in threaded mode)
+          readOnly: true
+          items:
+            $ref: '#/components/schemas/Comment'
+      required:
+        - id
+        - content
+        - postId
+        - authorId
+        - authorName
+        - status
+        - depth
+        - votes
+        - createdAt
+        - updatedAt
+
+    CreateCommentRequest:
+      type: object
+      properties:
+        content:
+          type: string
+          minLength: 1
+          maxLength: 1000
+          description: Comment content
+        parentId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Parent comment ID for replies
+      required:
+        - content
+
+    UpdateCommentRequest:
+      type: object
+      properties:
+        content:
+          type: string
+          minLength: 1
+          maxLength: 1000
+          description: Updated comment content
+        status:
+          type: string
+          enum: [active, moderated, deleted]
+          description: Updated moderation status (moderator+ only)
+
+    VoteRequest:
+      type: object
+      properties:
+        vote:
+          type: string
+          enum: [up, down, none]
+          description: Vote type ('none' removes existing vote)
+      required:
+        - vote
+
+    VoteResponse:
+      type: object
+      properties:
+        commentId:
+          type: string
+          format: uuid
+          description: Comment identifier
+        userVote:
+          type: string
+          enum: [up, down, none]
+          description: User's current vote
+        votes:
+          type: object
+          description: Updated vote counts
+          properties:
+            up:
+              type: integer
+              description: Total upvotes
+            down:
+              type: integer
+              description: Total downvotes
+            total:
+              type: integer
+              description: Net vote score
+        changed:
+          type: boolean
+          description: Whether vote was actually changed
+      required:
+        - commentId
+        - userVote
+        - votes
+        - changed
+
+    ModerationAction:
+      type: object
+      properties:
+        action:
+          type: string
+          enum: [approve, reject, flag, delete]
+          description: Moderation action to take
+        reason:
+          type: string
+          maxLength: 500
+          description: Reason for the action
+        category:
+          type: string
+          enum: [spam, inappropriate, off-topic, harassment, other]
+          description: Category of violation (for reject/flag actions)
+        notifyUser:
+          type: boolean
+          default: true
+          description: Whether to notify the comment author
+      required:
+        - action
+
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+          minimum: 1
+          description: Current page number
+        limit:
+          type: integer
+          minimum: 1
+          description: Items per page
+        totalPages:
+          type: integer
+          minimum: 0
+          description: Total number of pages
+        totalComments:
+          type: integer
+          minimum: 0
+          description: Total number of comments
+        hasNext:
+          type: boolean
+          description: Whether next page exists
+        hasPrev:
+          type: boolean
+          description: Whether previous page exists
+      required:
+        - page
+        - limit
+        - totalPages
+        - totalComments
+        - hasNext
+        - hasPrev
+
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded, unhealthy]
+        timestamp:
+          type: string
+          format: date-time
+        version:
+          type: string
+        uptime:
+          type: number
+          description: Service uptime in seconds
+        dependencies:
+          type: object
+          properties:
+            database:
+              type: string
+              enum: [healthy, unhealthy]
+            cache:
+              type: string
+              enum: [healthy, unhealthy]
+            posts_service:
+              type: string
+              enum: [healthy, unhealthy]
+        errors:
+          type: array
+          description: Error messages (when unhealthy)
+          items:
+            type: string
+      required:
+        - status
+        - timestamp
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Human-readable error message
+        code:
+          type: string
+          description: Machine-readable error code
+        timestamp:
+          type: string
+          format: date-time
+          description: Error timestamp
+        path:
+          type: string
+          description: API endpoint that generated the error
+      required:
+        - error
+
+    ValidationError:
+      allOf:
+        - $ref: '#/components/schemas/Error'
+        - type: object
+          properties:
+            details:
+              type: array
+              description: Field-specific validation errors
+              items:
+                type: object
+                properties:
+                  field:
+                    type: string
+                    description: Field name that failed validation
+                  message:
+                    type: string
+                    description: Validation error message
+                  value:
+                    description: Invalid value that was provided
+                required:
+                  - field
+                  - message
+
+  responses:
+    BadRequest:
+      description: Invalid request parameters
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Invalid query parameters"
+            code: "INVALID_PARAMETERS"
+            timestamp: "2025-08-15T12:00:00Z"
+            path: "/posts/123/comments"
+
+    ValidationError:
+      description: Validation errors in request body
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ValidationError'
+          example:
+            error: "Validation failed"
+            code: "VALIDATION_ERROR"
+            timestamp: "2025-08-15T12:00:00Z"
+            path: "/posts/123/comments"
+            details:
+              - field: "content"
+                message: "Content cannot be empty"
+                value: ""
+
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Authentication required"
+            code: "UNAUTHORIZED"
+            timestamp: "2025-08-15T12:00:00Z"
+            path: "/posts/123/comments"
+
+    Forbidden:
+      description: Insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Insufficient permissions"
+            code: "FORBIDDEN"
+            timestamp: "2025-08-15T12:00:00Z"
+            path: "/comments/123"
+
+    EditPermissionDenied:
+      description: Edit permission denied
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Insufficient permissions"
+            code: "EDIT_WINDOW_EXPIRED"
+            timestamp: "2025-08-15T12:00:00Z"
+            path: "/comments/123"
+
+    NotFound:
+      description: Comment not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Comment not found"
+            code: "NOT_FOUND"
+            timestamp: "2025-08-15T12:00:00Z"
+            path: "/comments/123"
+
+    PostNotFound:
+      description: Post not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Post not found"
+            code: "POST_NOT_FOUND"
+            timestamp: "2025-08-15T12:00:00Z"
+            path: "/posts/123/comments"
+
+    ResourceNotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Resource not found"
+            code: "RESOURCE_NOT_FOUND"
+            timestamp: "2025-08-15T12:00:00Z"
+            path: "/posts/123/comments"
+
+    DepthLimitExceeded:
+      description: Comment threading depth limit exceeded
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/Error'
+              - type: object
+                properties:
+                  maxDepth:
+                    type: integer
+                    description: Maximum allowed depth
+                  attemptedDepth:
+                    type: integer
+                    description: Attempted nesting depth
+          example:
+            error: "Maximum comment depth exceeded"
+            code: "DEPTH_LIMIT_EXCEEDED"
+            timestamp: "2025-08-15T12:00:00Z"
+            path: "/posts/123/comments"
+            maxDepth: 10
+            attemptedDepth: 11
+
+    SelfVoteConflict:
+      description: Cannot vote on own comment
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Cannot vote on own content"
+            code: "SELF_VOTE_FORBIDDEN"
+            timestamp: "2025-08-15T12:00:00Z"
+            path: "/comments/123/vote"
+
+    TooManyRequests:
+      description: Rate limit exceeded
+      headers:
+        X-RateLimit-Limit:
+          description: Request limit for the time window
+          schema:
+            type: integer
+        X-RateLimit-Remaining:
+          description: Remaining requests in current window
+          schema:
+            type: integer
+        X-RateLimit-Reset:
+          description: Timestamp when rate limit resets
+          schema:
+            type: integer
+        Retry-After:
+          description: Seconds to wait before retrying
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/Error'
+              - type: object
+                properties:
+                  retryAfter:
+                    type: integer
+                    description: Seconds to wait before retry
+          example:
+            error: "Too many requests"
+            code: "RATE_LIMITED"
+            timestamp: "2025-08-15T12:00:00Z"
+            path: "/posts/123/comments"
+            retryAfter: 60
+
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Internal server error"
+            code: "INTERNAL_ERROR"
+            timestamp: "2025-08-15T12:00:00Z"
+            path: "/posts/123/comments"
+
+tags:
+  - name: Comments
+    description: Comment management operations
+  - name: Voting
+    description: Comment voting system
+  - name: Moderation
+    description: Content moderation and review
+  - name: Search
+    description: Comment search and discovery
+  - name: Health
+    description: Service monitoring and health checks
+
+externalDocs:
+  description: Find more info about the Comments Service
+  url: https://docs.example.com/comments-service

@@ -1,0 +1,861 @@
+openapi: 3.0.3
+info:
+  title: Posts Service API
+  description: |
+    The Posts Service manages blog post lifecycle operations including creation, retrieval, editing, and deletion. 
+    This service operates independently and provides RESTful endpoints for content management with comprehensive 
+    validation, authentication, and error handling.
+    
+    ## Features
+    - CRUD operations for blog posts
+    - Tag-based filtering and search
+    - User role-based permissions
+    - Pagination support
+    - Content validation
+    - Real-time updates via WebSocket
+    
+    ## Authentication
+    Most endpoints require JWT Bearer token authentication. Public endpoints (like GET /posts) 
+    can be accessed without authentication but may have limited functionality.
+  version: 1.0.0
+  contact:
+    name: API Support
+    email: api-support@example.com
+    url: https://docs.example.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:4000
+    description: Development server
+  - url: https://api.example.com/posts
+    description: Production server
+
+security:
+  - BearerAuth: []
+  - {}
+
+paths:
+  /posts:
+    get:
+      summary: Retrieve all published posts
+      description: |
+        Returns a paginated list of all published blog posts with basic metadata. 
+        Supports filtering by tags, author, and date ranges. Anonymous users see only 
+        published posts; authenticated users see drafts they own.
+      operationId: getPosts
+      security:
+        - BearerAuth: []
+        - {}
+      parameters:
+        - name: page
+          in: query
+          description: Page number for pagination
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          description: Number of posts per page
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: tags
+          in: query
+          description: Comma-separated list of tags for filtering
+          schema:
+            type: string
+          example: "javascript,react,nodejs"
+        - name: author
+          in: query
+          description: Filter posts by author username
+          schema:
+            type: string
+        - name: status
+          in: query
+          description: Filter by post status (authenticated users only)
+          schema:
+            type: string
+            enum: [draft, published, archived]
+        - name: sort
+          in: query
+          description: Sort field
+          schema:
+            type: string
+            enum: [created, updated, title]
+            default: created
+        - name: order
+          in: query
+          description: Sort order
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+      responses:
+        '200':
+          description: Posts retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  posts:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Post'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+              examples:
+                basic_response:
+                  summary: Basic posts response
+                  value:
+                    posts:
+                      - id: "123e4567-e89b-12d3-a456-426614174000"
+                        title: "Getting Started with Microservices"
+                        content: "Microservices architecture has become..."
+                        excerpt: "Microservices architecture has become a popular approach..."
+                        authorId: "987fcdeb-51a2-43d1-b123-456789abcdef"
+                        authorName: "john_doe"
+                        tags: ["microservices", "architecture", "nodejs"]
+                        status: "published"
+                        createdAt: "2025-08-15T10:30:00Z"
+                        updatedAt: "2025-08-15T10:30:00Z"
+                        commentCount: 5
+                    pagination:
+                      page: 1
+                      limit: 20
+                      totalPages: 3
+                      totalPosts: 45
+                      hasNext: true
+                      hasPrev: false
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    post:
+      summary: Create a new blog post
+      description: |
+        Creates a new blog post with the authenticated user as the author. 
+        Validates title, content, and optional tags. Posts are created in 'draft' 
+        status by default and can be published by setting status to 'published'.
+      operationId: createPost
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePostRequest'
+            examples:
+              draft_post:
+                summary: Create draft post
+                value:
+                  title: "Understanding REST APIs"
+                  content: "REST (Representational State Transfer) is an architectural style..."
+                  tags: ["rest", "api", "webdev"]
+                  status: "draft"
+              published_post:
+                summary: Create published post
+                value:
+                  title: "Advanced Node.js Patterns"
+                  content: "In this post we'll explore advanced patterns for Node.js development..."
+                  tags: ["nodejs", "javascript", "patterns"]
+                  status: "published"
+      responses:
+        '201':
+          description: Post created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+              example:
+                id: "789e0123-e45f-67g8-h901-234567890123"
+                title: "Understanding REST APIs"
+                content: "REST (Representational State Transfer) is an architectural style..."
+                excerpt: "REST (Representational State Transfer) is an architectural style for designing..."
+                authorId: "987fcdeb-51a2-43d1-b123-456789abcdef"
+                authorName: "john_doe"
+                tags: ["rest", "api", "webdev"]
+                status: "draft"
+                createdAt: "2025-08-15T14:30:00Z"
+                updatedAt: "2025-08-15T14:30:00Z"
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /posts/{id}:
+    get:
+      summary: Retrieve a specific post by ID
+      description: |
+        Returns detailed information about a specific blog post. Public users can only 
+        access published posts, while authenticated users can access their own drafts and archived posts.
+      operationId: getPostById
+      security:
+        - BearerAuth: []
+        - {}
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Unique post identifier
+          schema:
+            type: string
+            format: uuid
+        - name: includeComments
+          in: query
+          description: Include comments in response
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: Post retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Post'
+                  - type: object
+                    properties:
+                      comments:
+                        type: array
+                        description: Post comments (if includeComments=true)
+                        items:
+                          $ref: '#/components/schemas/Comment'
+              example:
+                id: "123e4567-e89b-12d3-a456-426614174000"
+                title: "Getting Started with Microservices"
+                content: "Microservices architecture has become a popular approach..."
+                authorId: "987fcdeb-51a2-43d1-b123-456789abcdef"
+                authorName: "john_doe"
+                tags: ["microservices", "architecture", "nodejs"]
+                status: "published"
+                createdAt: "2025-08-15T10:30:00Z"
+                updatedAt: "2025-08-15T10:30:00Z"
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    put:
+      summary: Update an existing post
+      description: |
+        Updates an existing blog post. Users can only update their own posts unless 
+        they have admin privileges. All fields are optional; only provided fields will be updated.
+      operationId: updatePost
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Unique post identifier
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePostRequest'
+            examples:
+              update_title:
+                summary: Update post title and status
+                value:
+                  title: "Advanced Microservices Architecture Patterns"
+                  status: "published"
+              update_content:
+                summary: Update post content
+                value:
+                  content: "Updated content with new insights and examples..."
+                  tags: ["microservices", "architecture", "patterns", "design"]
+      responses:
+        '200':
+          description: Post updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Post'
+              example:
+                id: "123e4567-e89b-12d3-a456-426614174000"
+                title: "Advanced Microservices Architecture Patterns"
+                content: "Microservices architecture has become a popular approach..."
+                authorId: "987fcdeb-51a2-43d1-b123-456789abcdef"
+                authorName: "john_doe"
+                tags: ["microservices", "architecture", "nodejs"]
+                status: "published"
+                createdAt: "2025-08-15T10:30:00Z"
+                updatedAt: "2025-08-15T16:45:00Z"
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    delete:
+      summary: Delete a post
+      description: |
+        Permanently deletes a blog post. Users can only delete their own posts unless 
+        they have admin privileges. This action is irreversible.
+      operationId: deletePost
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Unique post identifier
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Post successfully deleted (no content returned)
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /posts/search:
+    get:
+      summary: Search posts by content
+      description: |
+        Full-text search across post titles and content. Supports advanced search 
+        operators and filtering by tags, author, and date ranges.
+      operationId: searchPosts
+      security:
+        - BearerAuth: []
+        - {}
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: Search query
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 200
+          example: "microservices architecture"
+        - name: page
+          in: query
+          description: Page number for pagination
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          description: Number of results per page
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 20
+        - name: tags
+          in: query
+          description: Filter by tags
+          schema:
+            type: string
+        - name: author
+          in: query
+          description: Filter by author
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  query:
+                    type: string
+                    description: Original search query
+                  results:
+                    type: array
+                    items:
+                      allOf:
+                        - $ref: '#/components/schemas/Post'
+                        - type: object
+                          properties:
+                            relevanceScore:
+                              type: number
+                              description: Search relevance score
+                            highlights:
+                              type: array
+                              description: Highlighted text snippets
+                              items:
+                                type: string
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /health:
+    get:
+      summary: Service health check
+      description: Returns the health status of the Posts Service
+      operationId: getHealth
+      security: []
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [healthy, degraded, unhealthy]
+                  timestamp:
+                    type: string
+                    format: date-time
+                  version:
+                    type: string
+                  uptime:
+                    type: number
+                    description: Service uptime in seconds
+                  dependencies:
+                    type: object
+                    properties:
+                      database:
+                        type: string
+                        enum: [healthy, unhealthy]
+                      cache:
+                        type: string
+                        enum: [healthy, unhealthy]
+              example:
+                status: "healthy"
+                timestamp: "2025-08-15T12:00:00Z"
+                version: "1.0.0"
+                uptime: 86400
+                dependencies:
+                  database: "healthy"
+                  cache: "healthy"
+        '503':
+          description: Service is unhealthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [degraded, unhealthy]
+                  timestamp:
+                    type: string
+                    format: date-time
+                  errors:
+                    type: array
+                    items:
+                      type: string
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT Bearer token obtained from the Authentication Service
+
+  schemas:
+    Post:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique post identifier
+          readOnly: true
+        title:
+          type: string
+          minLength: 3
+          maxLength: 200
+          description: Post title
+        content:
+          type: string
+          minLength: 10
+          maxLength: 10000
+          description: Full post content
+        excerpt:
+          type: string
+          maxLength: 300
+          description: Auto-generated excerpt
+          readOnly: true
+        authorId:
+          type: string
+          format: uuid
+          description: Post author identifier
+          readOnly: true
+        authorName:
+          type: string
+          description: Author display name
+          readOnly: true
+        tags:
+          type: array
+          maxItems: 5
+          description: Associated tags
+          items:
+            type: string
+            maxLength: 20
+            pattern: '^[a-zA-Z0-9-_]+$'
+        status:
+          type: string
+          enum: [draft, published, archived]
+          description: Publication status
+          default: draft
+        createdAt:
+          type: string
+          format: date-time
+          description: Creation timestamp
+          readOnly: true
+        updatedAt:
+          type: string
+          format: date-time
+          description: Last update timestamp
+          readOnly: true
+        commentCount:
+          type: integer
+          minimum: 0
+          description: Number of comments
+          readOnly: true
+      required:
+        - id
+        - title
+        - content
+        - authorId
+        - authorName
+        - status
+        - createdAt
+        - updatedAt
+
+    CreatePostRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 3
+          maxLength: 200
+          description: Post title
+        content:
+          type: string
+          minLength: 10
+          maxLength: 10000
+          description: Post content in markdown or plain text
+        tags:
+          type: array
+          maxItems: 5
+          description: Array of tag strings
+          items:
+            type: string
+            maxLength: 20
+            pattern: '^[a-zA-Z0-9-_]+$'
+        status:
+          type: string
+          enum: [draft, published]
+          description: Publication status
+          default: draft
+      required:
+        - title
+        - content
+
+    UpdatePostRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 3
+          maxLength: 200
+          description: Updated post title
+        content:
+          type: string
+          minLength: 10
+          maxLength: 10000
+          description: Updated post content
+        tags:
+          type: array
+          maxItems: 5
+          description: Updated tag list
+          items:
+            type: string
+            maxLength: 20
+            pattern: '^[a-zA-Z0-9-_]+$'
+        status:
+          type: string
+          enum: [draft, published, archived]
+          description: Updated publication status
+
+    Comment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique comment identifier
+        content:
+          type: string
+          description: Comment content
+        authorId:
+          type: string
+          format: uuid
+          description: Comment author identifier
+        authorName:
+          type: string
+          description: Author display name
+        createdAt:
+          type: string
+          format: date-time
+          description: Creation timestamp
+      required:
+        - id
+        - content
+        - authorId
+        - authorName
+        - createdAt
+
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+          minimum: 1
+          description: Current page number
+        limit:
+          type: integer
+          minimum: 1
+          description: Items per page
+        totalPages:
+          type: integer
+          minimum: 0
+          description: Total number of pages
+        totalPosts:
+          type: integer
+          minimum: 0
+          description: Total number of posts
+        hasNext:
+          type: boolean
+          description: Whether next page exists
+        hasPrev:
+          type: boolean
+          description: Whether previous page exists
+      required:
+        - page
+        - limit
+        - totalPages
+        - totalPosts
+        - hasNext
+        - hasPrev
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Human-readable error message
+        code:
+          type: string
+          description: Machine-readable error code
+        timestamp:
+          type: string
+          format: date-time
+          description: Error timestamp
+        path:
+          type: string
+          description: API endpoint that generated the error
+      required:
+        - error
+
+    ValidationError:
+      allOf:
+        - $ref: '#/components/schemas/Error'
+        - type: object
+          properties:
+            details:
+              type: array
+              description: Field-specific validation errors
+              items:
+                type: object
+                properties:
+                  field:
+                    type: string
+                    description: Field name that failed validation
+                  message:
+                    type: string
+                    description: Validation error message
+                  value:
+                    description: Invalid value that was provided
+                required:
+                  - field
+                  - message
+
+  responses:
+    BadRequest:
+      description: Invalid request parameters
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Invalid query parameters"
+            code: "INVALID_PARAMETERS"
+            timestamp: "2025-08-15T12:00:00Z"
+            path: "/posts"
+
+    ValidationError:
+      description: Validation errors in request body
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ValidationError'
+          example:
+            error: "Validation failed"
+            code: "VALIDATION_ERROR"
+            timestamp: "2025-08-15T12:00:00Z"
+            path: "/posts"
+            details:
+              - field: "title"
+                message: "Title must be at least 3 characters"
+                value: "Hi"
+              - field: "content"
+                message: "Content must be at least 10 characters long"
+                value: "Short"
+
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Authentication required"
+            code: "UNAUTHORIZED"
+            timestamp: "2025-08-15T12:00:00Z"
+            path: "/posts"
+
+    Forbidden:
+      description: Insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Insufficient permissions"
+            code: "FORBIDDEN"
+            timestamp: "2025-08-15T12:00:00Z"
+            path: "/posts/123"
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Post not found"
+            code: "NOT_FOUND"
+            timestamp: "2025-08-15T12:00:00Z"
+            path: "/posts/123"
+
+    TooManyRequests:
+      description: Rate limit exceeded
+      headers:
+        X-RateLimit-Limit:
+          description: Request limit for the time window
+          schema:
+            type: integer
+        X-RateLimit-Remaining:
+          description: Remaining requests in current window
+          schema:
+            type: integer
+        X-RateLimit-Reset:
+          description: Timestamp when rate limit resets
+          schema:
+            type: integer
+        Retry-After:
+          description: Seconds to wait before retrying
+          schema:
+            type: integer
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: '#/components/schemas/Error'
+              - type: object
+                properties:
+                  retryAfter:
+                    type: integer
+                    description: Seconds to wait before retry
+          example:
+            error: "Too many requests"
+            code: "RATE_LIMITED"
+            timestamp: "2025-08-15T12:00:00Z"
+            path: "/posts"
+            retryAfter: 60
+
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: "Internal server error"
+            code: "INTERNAL_ERROR"
+            timestamp: "2025-08-15T12:00:00Z"
+            path: "/posts"
+
+  examples:
+    SamplePost:
+      summary: Sample blog post
+      description: A typical blog post with all fields populated
+      value:
+        id: "123e4567-e89b-12d3-a456-426614174000"
+        title: "Understanding Microservices Architecture"
+        content: "Microservices architecture has become increasingly popular in modern software development. This approach involves breaking down applications into smaller, independent services that communicate over well-defined APIs. In this post, we'll explore the benefits, challenges, and best practices for implementing microservices."
+        excerpt: "Microservices architecture has become increasingly popular in modern software development. This approach involves breaking down applications into smaller, independent services..."
+        authorId: "987fcdeb-51a2-43d1-b123-456789abcdef"
+        authorName: "john_doe"
+        tags: ["microservices", "architecture", "software-design"]
+        status: "published"
+        createdAt: "2025-08-15T10:30:00Z"
+        updatedAt: "2025-08-15T10:30:00Z"
+        commentCount: 12
+
+tags:
+  - name: Posts
+    description: Blog post management operations
+  - name: Search
+    description: Content search and discovery
+  - name: Health
+    description: Service monitoring and health checks
+
+externalDocs:
+  description: Find more info about the Posts Service
+  url: https://docs.example.com/posts-service

@@ -1,0 +1,237 @@
+# Prometheus Alert Rules for Microservices
+
+groups:
+  - name: microservices.rules
+    rules:
+      # Service Health Alerts
+      - alert: ServiceDown
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Service {{ $labels.instance }} is down"
+          description: "{{ $labels.job }} service on {{ $labels.instance }} has been down for more than 1 minute."
+
+      - alert: ServiceHighErrorRate
+        expr: (rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High error rate on {{ $labels.job }}"
+          description: "{{ $labels.job }} has error rate above 5% for 5 minutes. Current rate: {{ $value | humanizePercentage }}"
+
+      - alert: ServiceHighLatency
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High latency on {{ $labels.job }}"
+          description: "{{ $labels.job }} 95th percentile latency is {{ $value }}s for 5 minutes."
+
+      # Resource Usage Alerts
+      - alert: HighCPUUsage
+        expr: (100 - (avg by (instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)) > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage on {{ $labels.instance }}"
+          description: "CPU usage is above 80% for 5 minutes on {{ $labels.instance }}. Current usage: {{ $value | humanizePercentage }}"
+
+      - alert: HighMemoryUsage
+        expr: ((node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes) > 0.85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage on {{ $labels.instance }}"
+          description: "Memory usage is above 85% for 5 minutes on {{ $labels.instance }}. Current usage: {{ $value | humanizePercentage }}"
+
+      - alert: LowDiskSpace
+        expr: ((node_filesystem_size_bytes - node_filesystem_free_bytes) / node_filesystem_size_bytes) > 0.85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Low disk space on {{ $labels.instance }}"
+          description: "Disk usage is above 85% for 5 minutes on {{ $labels.instance }} ({{ $labels.mountpoint }}). Current usage: {{ $value | humanizePercentage }}"
+
+  - name: database.rules
+    rules:
+      # MongoDB Alerts
+      - alert: MongoDBDown
+        expr: mongodb_up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "MongoDB is down"
+          description: "MongoDB instance {{ $labels.instance }} has been down for more than 1 minute."
+
+      - alert: MongoDBHighConnections
+        expr: mongodb_connections{state="current"} > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "MongoDB high connection count"
+          description: "MongoDB has {{ $value }} connections, which is above the threshold."
+
+      - alert: MongoDBSlowQueries
+        expr: rate(mongodb_mongod_op_counters_total[5m]) > 1000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "MongoDB high query rate"
+          description: "MongoDB query rate is {{ $value }} queries/second for 5 minutes."
+
+      # Redis Alerts
+      - alert: RedisDown
+        expr: redis_up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Redis is down"
+          description: "Redis instance {{ $labels.instance }} has been down for more than 1 minute."
+
+      - alert: RedisHighMemoryUsage
+        expr: (redis_memory_used_bytes / redis_memory_max_bytes) > 0.9
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis high memory usage"
+          description: "Redis memory usage is above 90% for 5 minutes. Current usage: {{ $value | humanizePercentage }}"
+
+      - alert: RedisHighConnectionCount
+        expr: redis_connected_clients > 100
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis high connection count"
+          description: "Redis has {{ $value }} connected clients, which is above the threshold."
+
+  - name: application.rules
+    rules:
+      # API Gateway Specific Alerts
+      - alert: APIGatewayHighRequestRate
+        expr: sum(rate(http_requests_total{job="api-gateway"}[5m])) > 1000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "API Gateway high request rate"
+          description: "API Gateway is receiving {{ $value }} requests/second for 5 minutes."
+
+      - alert: RateLimitingTriggered
+        expr: increase(rate_limit_exceeded_total[5m]) > 100
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Rate limiting frequently triggered"
+          description: "Rate limiting has been triggered {{ $value }} times in the last 5 minutes."
+
+      # Authentication Service Alerts
+      - alert: AuthServiceHighFailureRate
+        expr: (rate(auth_attempts_total{status="failed"}[5m]) / rate(auth_attempts_total[5m])) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Auth service high failure rate"
+          description: "Authentication failure rate is {{ $value | humanizePercentage }} for 5 minutes."
+
+      - alert: SuspiciousLoginActivity
+        expr: rate(auth_attempts_total{status="failed"}[1m]) > 10
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Suspicious login activity detected"
+          description: "Failed login attempts rate is {{ $value }}/minute, indicating potential attack."
+
+  - name: infrastructure.rules
+    rules:
+      # Container Alerts
+      - alert: ContainerHighCPU
+        expr: (rate(container_cpu_usage_seconds_total[5m]) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container high CPU usage"
+          description: "Container {{ $labels.name }} CPU usage is {{ $value | humanizePercentage }} for 5 minutes."
+
+      - alert: ContainerHighMemory
+        expr: (container_memory_usage_bytes / container_spec_memory_limit_bytes) > 0.9
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container high memory usage"
+          description: "Container {{ $labels.name }} memory usage is {{ $value | humanizePercentage }} for 5 minutes."
+
+      - alert: ContainerRestarting
+        expr: increase(container_start_time_seconds[10m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container restarting"
+          description: "Container {{ $labels.name }} has restarted in the last 10 minutes."
+
+      # Load Balancer Alerts
+      - alert: NginxDown
+        expr: nginx_up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Nginx is down"
+          description: "Nginx load balancer has been down for more than 1 minute."
+
+      - alert: NginxHighErrorRate
+        expr: (rate(nginx_http_requests_total{status=~"5.."}[5m]) / rate(nginx_http_requests_total[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Nginx high error rate"
+          description: "Nginx error rate is {{ $value | humanizePercentage }} for 5 minutes."
+
+  - name: business.rules
+    rules:
+      # Business Logic Alerts
+      - alert: LowPostCreationRate
+        expr: rate(posts_created_total[1h]) < 0.1
+        for: 30m
+        labels:
+          severity: info
+        annotations:
+          summary: "Low post creation rate"
+          description: "Post creation rate is {{ $value }}/hour for 30 minutes, which is unusually low."
+
+      - alert: HighCommentModerationQueue
+        expr: comments_pending_moderation > 100
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High comment moderation queue"
+          description: "There are {{ $value }} comments pending moderation for 15 minutes."
+
+      - alert: UnusualUserRegistrationSpike
+        expr: rate(user_registrations_total[5m]) > 10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Unusual user registration spike"
+          description: "User registration rate is {{ $value }}/minute for 5 minutes, which may indicate spam or attack."

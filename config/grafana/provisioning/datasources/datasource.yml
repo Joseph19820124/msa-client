@@ -1,0 +1,71 @@
+# Grafana Datasource Provisioning Configuration
+
+apiVersion: 1
+
+datasources:
+  - name: 'Prometheus'
+    type: 'prometheus'
+    access: 'proxy'
+    orgId: 1
+    url: 'http://prometheus:9090'
+    isDefault: true
+    version: 1
+    editable: true
+    jsonData:
+      timeInterval: '5s'
+      queryTimeout: '60s'
+      httpMethod: 'POST'
+      manageAlerts: true
+      alertmanagerUid: 'alertmanager'
+    secureJsonData: {}
+
+  - name: 'Elasticsearch'
+    type: 'elasticsearch'
+    access: 'proxy'
+    orgId: 1
+    url: 'http://elasticsearch:9200'
+    database: 'microservices-logs-*'
+    version: 1
+    editable: true
+    jsonData:
+      interval: 'Daily'
+      timeField: '@timestamp'
+      esVersion: '8.9.0'
+      maxConcurrentShardRequests: 5
+      logMessageField: 'message'
+      logLevelField: 'log_level'
+    secureJsonData: {}
+
+  - name: 'Elasticsearch-Errors'
+    type: 'elasticsearch'
+    access: 'proxy'
+    orgId: 1
+    url: 'http://elasticsearch:9200'
+    database: 'microservices-errors-*'
+    version: 1
+    editable: true
+    jsonData:
+      interval: 'Daily'
+      timeField: '@timestamp'
+      esVersion: '8.9.0'
+      maxConcurrentShardRequests: 5
+      logMessageField: 'message'
+      logLevelField: 'log_level'
+    secureJsonData: {}
+
+  - name: 'Elasticsearch-Security'
+    type: 'elasticsearch'
+    access: 'proxy'
+    orgId: 1
+    url: 'http://elasticsearch:9200'
+    database: 'microservices-security-*'
+    version: 1
+    editable: true
+    jsonData:
+      interval: 'Daily'
+      timeField: '@timestamp'
+      esVersion: '8.9.0'
+      maxConcurrentShardRequests: 5
+      logMessageField: 'message'
+      logLevelField: 'log_level'
+    secureJsonData: {}
