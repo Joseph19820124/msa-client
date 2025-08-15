@@ -27,9 +27,10 @@ const config = {
     }
   },
 
-  // Security Configuration
+  // Security Configuration - JWT Verification
   security: {
-    jwtSecret: process.env.JWT_SECRET || 'demo-secret-change-in-production',
+    jwtPublicKey: process.env.JWT_PUBLIC_KEY || null,
+    jwtAlgorithm: process.env.JWT_ALGORITHM || 'RS256',
     bcryptRounds: parseInt(process.env.BCRYPT_ROUNDS) || 12,
     corsOrigins: process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(',') : ['http://localhost:3000'],
     trustProxy: process.env.TRUST_PROXY === 'true' || false
@@ -124,7 +125,7 @@ const config = {
 const validateConfig = () => {
   const requiredInProduction = [
     'MONGODB_URI',
-    'JWT_SECRET'
+    'JWT_PUBLIC_KEY'
   ];
 
   if (config.server.environment === 'production') {
@@ -136,8 +137,8 @@ const validateConfig = () => {
     }
 
     // Additional production checks
-    if (config.security.jwtSecret === 'demo-secret-change-in-production') {
-      console.error('JWT_SECRET must be changed in production');
+    if (!config.security.jwtPublicKey) {
+      console.error('JWT_PUBLIC_KEY must be set in production');
       process.exit(1);
     }
 

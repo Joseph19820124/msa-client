@@ -11,9 +11,10 @@ const config = {
     testUri: process.env.MONGODB_TEST_URI || 'mongodb://localhost:27017/posts-service-test'
   },
   
-  // JWT Configuration
+  // JWT Configuration - For token verification
   jwt: {
-    secret: process.env.JWT_SECRET || 'fallback-secret-change-in-production',
+    publicKey: process.env.JWT_PUBLIC_KEY || null,
+    algorithm: process.env.JWT_ALGORITHM || 'RS256',
     expiresIn: process.env.JWT_EXPIRES_IN || '24h'
   },
   
@@ -48,8 +49,8 @@ const config = {
 
 // Validation
 if (config.nodeEnv === 'production') {
-  if (config.jwt.secret === 'fallback-secret-change-in-production') {
-    throw new Error('JWT_SECRET must be set in production environment');
+  if (!config.jwt.publicKey) {
+    throw new Error('JWT_PUBLIC_KEY must be set in production environment');
   }
   
   if (!process.env.MONGODB_URI) {
