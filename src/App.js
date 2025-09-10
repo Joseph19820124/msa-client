@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import PostCreate from "./PostCreate";
 import PostList from "./PostList";
+import NikeApiComponent from "./NikeApiComponent";
 import "./styles.css";
 
 const App = () => {
@@ -25,6 +26,11 @@ const App = () => {
       <div className="section">
         <h2 className="section-title">📚 Recent Posts</h2>
         <PostList key={refreshTrigger} />
+      </div>
+      
+      <div className="section">
+        <h2 className="section-title">🛍️ Nike API Integration</h2>
+        <NikeApiComponent />
       </div>
     </div>
   );
