@@ -326,3 +326,350 @@ body {
   height: 20px;
   fill: currentColor;
 }
+
+/* Strands Agent Demo Styles */
+.strands-agent-demo {
+  margin-bottom: 30px;
+}
+
+.demo-header {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.demo-header h2 {
+  font-size: 2.2rem;
+  font-weight: 700;
+  color: #2d3748;
+  margin-bottom: 10px;
+}
+
+.demo-header p {
+  font-size: 1.1rem;
+  color: #4a5568;
+  margin-bottom: 20px;
+}
+
+.agent-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin-top: 10px;
+}
+
+.agent-status.active {
+  background-color: #c6f6d5;
+  color: #22543d;
+  border: 1px solid #9ae6b4;
+}
+
+.agent-status.inactive {
+  background-color: #fed7d7;
+  color: #742a2a;
+  border: 1px solid #fc8181;
+}
+
+.agent-name {
+  font-weight: 400;
+  margin-left: 8px;
+}
+
+.demo-controls {
+  display: grid;
+  gap: 25px;
+  margin-bottom: 30px;
+}
+
+.control-section {
+  background: white;
+  border-radius: 15px;
+  padding: 25px;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.control-section h3 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #2d3748;
+  margin-bottom: 15px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.button-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.demo-input {
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 12px 16px;
+  font-size: 1rem;
+  font-family: 'Inter', sans-serif;
+  transition: all 0.3s ease;
+  background: #fafafa;
+  resize: vertical;
+  min-height: 80px;
+}
+
+.demo-input:focus {
+  outline: none;
+  border-color: #667eea;
+  background: white;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.btn-info {
+  background: linear-gradient(135deg, #4299e1, #3182ce);
+  color: white;
+  box-shadow: 0 4px 15px rgba(66, 153, 225, 0.3);
+}
+
+.btn-info:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(66, 153, 225, 0.4);
+}
+
+.btn-danger {
+  background: linear-gradient(135deg, #f56565, #e53e3e);
+  color: white;
+  box-shadow: 0 4px 15px rgba(245, 101, 101, 0.3);
+}
+
+.btn-danger:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(245, 101, 101, 0.4);
+}
+
+.btn-secondary {
+  background: linear-gradient(135deg, #a0aec0, #718096);
+  color: white;
+  box-shadow: 0 4px 15px rgba(160, 174, 192, 0.3);
+}
+
+.btn-secondary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(160, 174, 192, 0.4);
+}
+
+.btn-success {
+  background: linear-gradient(135deg, #48bb78, #38a169);
+  color: white;
+  box-shadow: 0 4px 15px rgba(72, 187, 120, 0.3);
+}
+
+.btn-success:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(72, 187, 120, 0.4);
+}
+
+.btn-warning {
+  background: linear-gradient(135deg, #ed8936, #dd6b20);
+  color: white;
+  box-shadow: 0 4px 15px rgba(237, 137, 54, 0.3);
+}
+
+.btn-warning:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(237, 137, 54, 0.4);
+}
+
+.btn-outline {
+  background: transparent;
+  color: #4a5568;
+  border: 2px solid #e2e8f0;
+}
+
+.btn-outline:hover {
+  background: #f7fafc;
+  border-color: #cbd5e0;
+}
+
+.btn-sm {
+  padding: 8px 16px;
+  font-size: 0.85rem;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+.demo-results {
+  margin-bottom: 30px;
+}
+
+.results-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.results-header h3 {
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: #2d3748;
+  margin: 0;
+}
+
+.results-container {
+  background: white;
+  border-radius: 15px;
+  padding: 20px;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+  max-height: 500px;
+  overflow-y: auto;
+}
+
+.no-results {
+  text-align: center;
+  color: #a0aec0;
+  font-style: italic;
+  padding: 40px 20px;
+}
+
+.result-item {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  margin-bottom: 15px;
+  overflow: hidden;
+}
+
+.result-item:last-child {
+  margin-bottom: 0;
+}
+
+.result-header {
+  background: #f8fafc;
+  padding: 12px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.result-action {
+  font-weight: 600;
+  color: #2d3748;
+}
+
+.result-time {
+  font-size: 0.85rem;
+  color: #718096;
+}
+
+.result-content {
+  padding: 16px;
+  background: #fafafa;
+}
+
+.result-content pre {
+  margin: 0;
+  font-family: 'Fira Code', 'Monaco', 'Menlo', monospace;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  color: #2d3748;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.demo-info {
+  margin-top: 30px;
+}
+
+.demo-info h3 {
+  font-size: 1.4rem;
+  font-weight: 600;
+  color: #2d3748;
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+}
+
+.info-card {
+  background: white;
+  border-radius: 15px;
+  padding: 25px;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.info-card h4 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #2d3748;
+  margin-bottom: 15px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.info-card ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.info-card li {
+  padding: 8px 0;
+  color: #4a5568;
+  border-bottom: 1px solid #f1f5f9;
+  position: relative;
+  padding-left: 20px;
+}
+
+.info-card li:last-child {
+  border-bottom: none;
+}
+
+.info-card li:before {
+  content: '✓';
+  position: absolute;
+  left: 0;
+  top: 8px;
+  color: #48bb78;
+  font-weight: bold;
+}
+
+@media (max-width: 768px) {
+  .button-group {
+    justify-content: center;
+  }
+  
+  .results-header {
+    flex-direction: column;
+    gap: 10px;
+    text-align: center;
+  }
+  
+  .info-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .demo-header h2 {
+    font-size: 1.8rem;
+  }
+}
