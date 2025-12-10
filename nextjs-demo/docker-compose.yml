@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  nextjs-demo:
+    build: 
+      context: .
+      args:
+        - POSTS_SERVICE_URL=http://localhost:4000
+        - COMMENTS_SERVICE_URL=http://localhost:4001
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - POSTS_SERVICE_URL=http://localhost:4000
+      - COMMENTS_SERVICE_URL=http://localhost:4001
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
