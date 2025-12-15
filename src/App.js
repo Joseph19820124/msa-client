@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import PostCreate from "./PostCreate";
 import PostList from "./PostList";
+import NFLScores from "./NFLScores";
 import "./styles.css";
 
 const App = () => {
@@ -25,6 +26,10 @@ const App = () => {
       <div className="section">
         <h2 className="section-title">📚 Recent Posts</h2>
         <PostList key={refreshTrigger} />
+      </div>
+      
+      <div className="section">
+        <NFLScores />
       </div>
     </div>
   );
